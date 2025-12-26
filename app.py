@@ -5,15 +5,15 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# ==================================
-# DADOS Z-API (COM CLIENT TOKEN)
-# ==================================
+# ==================================================
+# CONFIGURAÇÕES Z-API (CLIENT TOKEN ATIVO)
+# ==================================================
 ZAPI_INSTANCE = "3EC42CD717B182BE009E5A8D44CAB450"
 CLIENT_TOKEN = "F0d19adbde8554463ab200473ded89ccbS"
 
-# ==================================
+# ==================================================
 # HEALTH CHECK
-# ==================================
+# ==================================================
 @app.route("/", methods=["GET"])
 def health():
     return jsonify({
@@ -21,9 +21,9 @@ def health():
         "time": datetime.now().isoformat()
     })
 
-# ==================================
+# ==================================================
 # WEBHOOK Z-API
-# ==================================
+# ==================================================
 @app.route("/webhook", methods=["POST", "GET"])
 def webhook():
     if request.method == "GET":
@@ -48,11 +48,11 @@ def webhook():
 
     return jsonify({"status": "ok"})
 
-# ==================================
-# ENVIO DE MENSAGEM (CLIENT TOKEN)
-# ==================================
+# ==================================================
+# ENVIO DE MENSAGEM (ENDPOINT CORRETO + CLIENT TOKEN)
+# ==================================================
 def send_message(phone, text):
-    url = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}/send-text"
+    url = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}/messages/send-text"
 
     payload = {
         "phone": phone,
@@ -75,9 +75,9 @@ def send_message(phone, text):
     except Exception as e:
         print("❌ ERRO AO ENVIAR:", e)
 
-# ==================================
-# START (RAILWAY)
-# ==================================
+# ==================================================
+# START SERVER (RAILWAY)
+# ==================================================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     print(f"🚀 Servidor iniciando na porta {port}")
