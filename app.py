@@ -2,25 +2,15 @@ from flask import Flask, request, jsonify
 import requests
 import os
 from datetime import datetime
+import time
 
 app = Flask(__name__)
 
 # ===============================
-# ✅ SEUS DADOS CORRETOS (CONFIRMADOS)
+# ✅ NOVOS DADOS ATUALIZADOS
 # ===============================
 ZAPI_INSTANCE = "3EC42CD717B182BE009E5A8D44CAB450"
-ZAPI_TOKEN = "7F96D7006D280E9EB5081FD1"
-
-# ===============================
-# HEALTH CHECK
-# ===============================
-@app.route("/", methods=["GET"])
-def health():
-    return jsonify({
-        "status": "online",
-        "instance": ZAPI_INSTANCE[:10] + "...",
-        "time": datetime.now().isoformat()
-    })
+ZAPI_TOKEN = "C1C4D4B66FC02593FCCB149E"  # NOVO TOKEN!
 
 # ===============================
 # WEBHOOK PRINCIPAL
@@ -28,30 +18,24 @@ def health():
 @app.route("/webhook", methods=["POST", "GET"])
 def webhook():
     if request.method == "GET":
-        print("✅ Webhook testado - Tudo OK!")
         return jsonify({
             "status": "ready",
             "instance": ZAPI_INSTANCE,
-            "webhook": "configured"
+            "token": ZAPI_TOKEN[:8] + "...",
+            "time": datetime.now().isoformat()
         }), 200
 
     data = request.json
-    print("\n" + "="*60)
-    print("📩 MENSAGEM RECEBIDA VIA WEBHOOK")
-    print(f"ID da Instância: {data.get('instanceId')}")
-    print(f"Esperado: {ZAPI_INSTANCE}")
-    print(f"De: {data.get('phone')} ({data.get('senderName')})")
-    print(f"Texto: '{data.get('text', {}).get('message')}'")
-    print("="*60)
-
-    # Verifica se a instância bate com a configurada
-    if data.get("instanceId") != ZAPI_INSTANCE:
-        print(f"⚠️  Atenção: Instância diferente!")
-        print(f"   Recebido: {data.get('instanceId')}")
-        print(f"   Configurado: {ZAPI_INSTANCE}")
+    print(f"\n{'='*60}")
+    print(f"📩 MENSAGEM RECEBIDA - {datetime.now().strftime('%H:%M:%S')}")
+    print(f"{'='*60}")
+    print(f"👤 De: {data.get('senderName')} ({data.get('phone')})")
+    print(f"💬 Texto: '{data.get('text', {}).get('message', '')}'")
+    print(f"🆔 Instance ID: {data.get('instanceId')}")
+    print(f"✅ Token usado: {ZAPI_TOKEN}")
+    print(f"{'='*60}")
 
     if data.get("fromMe"):
-        print("📤 Ignorando mensagem enviada por mim")
         return jsonify({"status": "ignored"})
 
     phone = data.get("phone")
@@ -60,28 +44,34 @@ def webhook():
     if not phone or not message:
         return jsonify({"status": "invalid_payload"})
 
-    # Resposta personalizada
-    resposta = f"""🤖 *BOT ATIVO!*
+    # Resposta automática
+    resposta = f"""✅ *Mensagem Recebida com Sucesso!*
 
-✅ *Mensagem recebida:* {message}
+*Seu texto:* {message}
 
-📱 *De:* {data.get('senderName', 'Usuário')}
-🕒 *Hora:* {datetime.now().strftime('%H:%M:%S')}
+*Detalhes:*
+📅 Data: {datetime.now().strftime('%d/%m/%Y')}
+⏰ Hora: {datetime.now().strftime('%H:%M:%S')}
+🤖 Bot: Online e funcionando!
 
-_Esta é uma resposta automática do bot._"""
+_Esta é uma resposta automática do seu bot._"""
 
-    # Envia resposta
-    success = send_message(phone, resposta)
+    # Tenta enviar a resposta
+    success = send_message_zapi(phone, resposta)
     
     if success:
-        return jsonify({"status": "message_sent"})
+        print("🎉 RESPOSTA ENVIADA COM SUCESSO!")
+        return jsonify({"status": "success", "message": "sent"})
     else:
-        return jsonify({"status": "send_failed"}), 500
+        print("⚠️ Falha ao enviar resposta")
+        return jsonify({"status": "error", "message": "send_failed"}), 500
 
 # ===============================
-# FUNÇÃO DE ENVIO COM TRATAMENTO DE ERROS
+# FUNÇÃO DE ENVIO OTIMIZADA
 # ===============================
-def send_message(phone, text):
+def send_message_zapi(phone, text):
+    """Envia mensagem via Z-API com novo token"""
+    
     url = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}/token/{ZAPI_TOKEN}/send-text"
     
     payload = {
@@ -90,90 +80,105 @@ def send_message(phone, text):
     }
     
     headers = {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Accept": "application/json"
     }
     
-    print(f"\n📤 ENVIANDO RESPOSTA PARA {phone}...")
+    print(f"\n📤 TENTANDO ENVIAR RESPOSTA...")
+    print(f"🔗 URL: {url}")
+    print(f"📱 Para: {phone}")
+    print(f"📝 Mensagem: {text[:50]}...")
     
     try:
         response = requests.post(url, json=payload, headers=headers, timeout=15)
         
-        print(f"📊 Status Code: {response.status_code}")
-        print(f"📄 Resposta Bruta: {response.text}")
+        print(f"\n📊 RESPOSTA DA Z-API:")
+        print(f"Status: {response.status_code}")
+        print(f"Conteúdo: {response.text}")
         
         if response.status_code == 200:
-            print("✅ ✅ ✅ MENSAGEM ENVIADA COM SUCESSO!")
+            print("✅ ✅ ✅ ENVIO BEM-SUCEDIDO!")
+            print(f"Token {ZAPI_TOKEN} está FUNCIONANDO!")
             return True
             
         elif response.status_code == 400:
             error_data = response.json()
-            if "error" in error_data:
-                error_msg = error_data["error"]
-                print(f"❌ ERRO 400: {error_msg}")
+            error_msg = error_data.get("error", "Erro desconhecido")
+            print(f"❌ ERRO 400: {error_msg}")
+            
+            # Análise específica do erro
+            if "client-token" in error_msg.lower():
+                print("\n🔍 DIAGNÓSTICO DO ERRO 'client-token not configured':")
+                print("1. O token foi gerado há menos de 2 minutos?")
+                print("2. A instância foi reiniciada após gerar novo token?")
+                print("3. O WhatsApp está conectado na instância?")
                 
-                if "client-token" in error_msg.lower():
-                    print("⚠️  Problema com o token. Verifique:")
-                    print(f"   1. Token correto: {ZAPI_TOKEN}")
-                    print(f"   2. Instância correta: {ZAPI_INSTANCE}")
-                    print(f"   3. Token configurado no painel Z-API")
-                    
+                # Sugere teste manual
+                print("\n💡 TESTE MANUAL (execute no terminal):")
+                print(f'curl -X POST "{url}" \\')
+                print('  -H "Content-Type: application/json" \\')
+                print(f'  -d \'{{"phone": "{phone}", "message": "Teste direto"}}\'')
+                
         elif response.status_code == 404:
             print("❌ ERRO 404: Instância não encontrada")
-            print(f"   URL usada: {url}")
-            print("   Verifique se a instância ainda está ativa no painel Z-API")
-            
-        elif response.status_code == 401:
-            print("❌ ERRO 401: Token inválido ou expirado")
-            print("   Gere um novo token no painel Z-API")
+            print("   Verifique se a instância ainda está ativa no painel")
             
         else:
-            print(f"❌ ERRO DESCONHECIDO: {response.status_code}")
-            print(f"   Resposta: {response.text}")
+            print(f"⚠️ Status inesperado: {response.status_code}")
             
-        return False
-        
-    except requests.exceptions.Timeout:
-        print("❌ TIMEOUT: A requisição demorou muito")
-        return False
-        
-    except requests.exceptions.ConnectionError:
-        print("❌ ERRO DE CONEXÃO: Não foi possível conectar à Z-API")
         return False
         
     except Exception as e:
-        print(f"❌ ERRO INESPERADO: {str(e)}")
+        print(f"❌ EXCEÇÃO: {str(e)}")
         return False
 
 # ===============================
-# TESTE MANUAL (opcional)
+# ROTA DE TESTE MANUAL
 # ===============================
-@app.route("/test", methods=["GET"])
-def test_send():
-    """Rota para teste manual do envio"""
+@app.route("/teste-envio", methods=["GET"])
+def teste_envio():
+    """Rota para testar envio manualmente"""
     phone = request.args.get("phone", "553191316890")
-    message = request.args.get("message", "Teste do bot")
+    message = request.args.get("msg", "Teste do bot com novo token")
     
-    success = send_message(phone, f"🧪 Teste manual:\n{message}")
+    print(f"\n🧪 TESTE MANUAL SOLICITADO")
+    print(f"Para: {phone}")
+    print(f"Mensagem: {message}")
+    print(f"Token usado: {ZAPI_TOKEN}")
+    
+    success = send_message_zapi(phone, f"🧪 Teste Manual:\n{message}\n\nToken: {ZAPI_TOKEN[:8]}...")
     
     if success:
-        return jsonify({"status": "test_sent", "to": phone})
+        return jsonify({
+            "status": "test_success",
+            "to": phone,
+            "token": ZAPI_TOKEN[:8] + "...",
+            "timestamp": datetime.now().isoformat()
+        })
     else:
-        return jsonify({"status": "test_failed"}), 500
+        return jsonify({
+            "status": "test_failed",
+            "error": "Falha no envio",
+            "token": ZAPI_TOKEN[:8] + "..."
+        }), 500
 
 # ===============================
-# VERIFICAÇÃO DA INSTÂNCIA
+# VERIFICAÇÃO DE CONEXÃO
 # ===============================
-@app.route("/check-instance", methods=["GET"])
-def check_instance():
-    """Verifica se a instância está ativa"""
+@app.route("/status", methods=["GET"])
+def status():
+    """Verifica status da instância e token"""
     url = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}/token/{ZAPI_TOKEN}/instance"
     
     try:
         response = requests.get(url, timeout=10)
         return jsonify({
-            "status": "instance_check",
-            "code": response.status_code,
-            "response": response.json() if response.status_code == 200 else response.text
+            "instance": ZAPI_INSTANCE,
+            "token": ZAPI_TOKEN[:8] + "...",
+            "api_status": response.status_code,
+            "response": response.json() if response.status_code == 200 else response.text,
+            "webhook_url": "https://whatsapp-bot-production-1ad3.up.railway.app/webhook",
+            "timestamp": datetime.now().isoformat()
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -184,28 +189,29 @@ def check_instance():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     
-    print("\n" + "="*70)
-    print("🤖 WHATSAPP BOT - CONFIGURAÇÃO ATUAL")
+    print(f"\n{'='*70}")
+    print("🤖 WHATSAPP BOT - NOVA CONFIGURAÇÃO")
     print("="*70)
-    print(f"📍 Porta do servidor: {port}")
     print(f"📱 Instance ID: {ZAPI_INSTANCE}")
-    print(f"🔑 Token: {ZAPI_TOKEN}")
-    print(f"🔗 URL da API: https://api.z-api.io/instances/{ZAPI_INSTANCE}/token/{ZAPI_TOKEN}/send-text")
-    print(f"🌐 Seu webhook: https://whatsapp-bot-production-1ad3.up.railway.app/webhook")
+    print(f"🔑 NOVO TOKEN: {ZAPI_TOKEN}")
+    print(f"🔗 URL Completa:")
+    print(f"   https://api.z-api.io/instances/{ZAPI_INSTANCE}/token/{ZAPI_TOKEN}/send-text")
+    print(f"🌐 Seu Webhook:")
+    print(f"   https://whatsapp-bot-production-1ad3.up.railway.app/webhook")
     print("="*70)
-    print("📋 ROTAS DISPONÍVEIS:")
-    print(f"   GET  /               - Health check")
-    print(f"   GET  /webhook        - Teste webhook")
-    print(f"   POST /webhook        - Recebe mensagens")
-    print(f"   GET  /test           - Teste envio manual")
-    print(f"   GET  /check-instance - Verifica instância")
+    print("📋 ROTAS PARA TESTE:")
+    print(f"   • GET /             - Health check")
+    print(f"   • GET /webhook      - Teste webhook")
+    print(f"   • GET /status       - Status da instância")
+    print(f"   • GET /teste-envio  - Teste manual")
+    print(f"   • GET /teste-envio?phone=553191316890&msg=Olá")
     print("="*70)
-    print("\n⚠️  CONFIGURAÇÃO NO Z-API:")
-    print("1. Acesse: https://console.z-api.io")
-    print("2. Vá na sua instância")
-    print("3. Em 'Webhooks', configure:")
-    print(f"   URL: https://whatsapp-bot-production-1ad3.up.railway.app/webhook")
-    print("4. Salve e teste enviando uma mensagem!")
-    print("="*70 + "\n")
+    print("\n⚠️  CONFIGURAÇÃO NECESSÁRIA:")
+    print("1. No Z-API, vá em 'Webhooks e configurações gerais'")
+    print("2. Configure a URL: https://whatsapp-bot-production-1ad3.up.railway.app/webhook")
+    print("3. Marque 'Ao receber mensagem'")
+    print("4. SALVE as configurações")
+    print("5. REINICIE a instância (opcional)")
+    print("="*70)
     
     app.run(host="0.0.0.0", port=port, debug=False)
