@@ -6,10 +6,11 @@ from datetime import datetime
 app = Flask(__name__)
 
 # ===============================
-# Z-API – TOKEN DA INSTÂNCIA
+# Z-API – TOKEN DA INSTÂNCIA (CORRIGIDO)
 # ===============================
-ZAPI_INSTANCE = "3EC42CD717B182BE009E5A8D44CAB450"
-ZAPI_TOKEN = "7F96D7006D280E9EB5081FD1"
+# Use os dados EXATOS do painel Z-API
+ZAPI_INSTANCE = "3EC42CD7178182BE009E5A8D4ACAB450"  # Corrigido
+ZAPI_TOKEN = "7F96D7006D280E9EB5081FD1"  # Verifique se este é o token correto
 
 # ===============================
 # HEALTH CHECK
@@ -45,22 +46,28 @@ def webhook():
     return jsonify({"status": "ok"})
 
 # ===============================
-# ENVIO DE MENSAGEM (SEM HEADER)
+# ENVIO DE MENSAGEM
 # ===============================
 def send_message(phone, text):
-    url = (
-        f"https://api.z-api.io/instances/"
-        f"{ZAPI_INSTANCE}/token/{ZAPI_TOKEN}/send-text"
-    )
-
+    url = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}/token/{ZAPI_TOKEN}/send-text"
+    
     payload = {
         "phone": phone,
         "message": text
     }
+    
+    headers = {
+        "Content-Type": "application/json",
+        "Client-Token": ZAPI_TOKEN  # Algumas versões da Z-API exigem este header
+    }
 
     try:
-        response = requests.post(url, json=payload, timeout=10)
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
         print("📤 RESPOSTA Z-API:", response.status_code, response.text)
+        
+        if response.status_code == 400:
+            print("❌ ERRO: Verifique instanceId e token no painel Z-API")
+            
     except Exception as e:
         print("❌ ERRO AO ENVIAR:", e)
 
@@ -70,4 +77,6 @@ def send_message(phone, text):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     print(f"🚀 Servidor iniciando na porta {port}")
+    print(f"📱 Instance ID: {ZAPI_INSTANCE}")
+    print(f"🔑 Token (primeiros 10 chars): {ZAPI_TOKEN[:10]}...")
     app.run(host="0.0.0.0", port=port)
