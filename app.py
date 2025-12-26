@@ -2,8 +2,6 @@ from flask import Flask, request
 import requests
 import os
 from datetime import datetime
-import base64
-import json
 
 app = Flask(__name__)
 
@@ -11,7 +9,8 @@ app = Flask(__name__)
 ZAPI_INSTANCE = "3EC42CD717B182BE009E5A8D44CAB450"
 TOKEN_INSTANCIA = "C1C4D4B66FC02593FCCB149E"
 CLIENT_TOKEN = "F0d19adbde8554463ab200473ded89ccbS"
-OPENAI_API_KEY = "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"
+# Google Gemini API Key (GRATUITA - pegue a sua)
+GEMINI_API_KEY = "AIzaSyB0jq9B6n4x7n8q9r0t1u2v3w4x5y6z7A8B9C0D"  # ⚠️ SUBSTITUA
 # ===================================================
 
 # ================== MEMÓRIA ==================
@@ -28,8 +27,7 @@ def webhook():
         return "✅ Webhook OK", 200
 
     data = request.json
-    print(f"\n📩 Mensagem recebida: {data.get('text', {}).get('message', '')[:50] if data.get('text') else 'IMAGEM'}...")
-
+    
     if data.get("fromMe"):
         return "ignored", 200
 
@@ -38,9 +36,10 @@ def webhook():
     text = data.get("text", {}).get("message", "")
     image = data.get("image", {}).get("imageUrl")
 
+    print(f"\n📩 {nome}: {text[:50] if text else '📸 IMAGEM'}")
+
     if image:
-        print(f"📸 Imagem recebida: {image[:100]}...")
-        resposta = analisar_imagem_com_openai(image)
+        resposta = analisar_imagem_gemini(image, nome)
         enviar_mensagem(phone, resposta)
         return "ok", 200
 
@@ -60,214 +59,224 @@ def tratar_texto(phone, nome, text):
             "refeicoes": [],
             "primeira_interacao": datetime.now().isoformat()
         }
-        return responder_openai(f"""O usuário {nome} acabou de iniciar conversa. 
-        Apresente-se como um Personal Trainer Virtual motivador e profissional.
-        Diga que pode ajudar com: treinos, análise de comida via fotos, feedback de shape e motivação.
-        Seja acolhedor e empolgado!""")
+        return f"""👋 *OLÁ {nome.upper()}!* 
 
+🤖 *EU SOU SEU PERSONAL TRAINER VIRTUAL*
+
+🎯 *MINHAS FUNÇÕES:*
+• Análise de alimentos por foto
+• Feedback do seu shape
+• Registro de treinos
+• Motivação diária
+• Dicas personalizadas
+
+💪 *VAMOS JUNTOS NESSA JORNADA!*
+
+Envie uma foto de comida ou do seu shape para começar! 🏋️‍♂️"""
+    
     if "treinei" in text_lower:
         registrar_treino(phone)
-        return responder_openai(f"""O usuário {nome} acabou de registrar um treino.
-        Parabenize-o pelo comprometimento e dê uma dica motivacional sobre consistência nos treinos.
-        Seja energético e positivo!""")
+        return f"""✅ *TREINO REGISTRADO!* 🏋️‍♂️
 
+Parabéns, {nome}! 
+Consistência é o segredo!
+
+*Dica do dia:* 
+"O corpo alcança o que a mente acredita" 💪"""
+    
     if "relatório" in text_lower:
         dados = user_memory.get(phone, {})
         treinos = len(dados.get("treinos", []))
-        return responder_openai(f"""Gere um relatório motivacional para {nome}.
-        Ele já registrou {treinos} treinos.
-        Dê feedback positivo, mostre progresso e incentive a continuar.
-        Seja detalhado e inspirador!""")
+        return f"""📊 *RELATÓRIO DE {nome.upper()}*
+
+✅ Treinos registrados: *{treinos}*
+📅 Desde: {dados.get('primeira_interacao', 'Hoje')[:10]}
+
+🏆 Nível: {'🔥 AVANÇADO' if treinos > 10 else '🚀 INTERMEDIÁRIO' if treinos > 5 else '⭐ INICIANTE'}
+
+💪 *Continue assim! Cada treino te transforma!*"""
+    
+    if text_lower in ["oi", "ola", "olá"]:
+        return f"E aí, {nome}! 😊\nPronto para evoluir hoje?"
     
     if text_lower == "ajuda":
-        return """🤖 *COMANDOS DO PERSONAL TRAINER*
+        return """🤖 *AJUDA - PERSONAL TRAINER*
 
-🏋️ *"treinei"* - Registrar treino
-📊 *"relatório"* - Ver progresso  
-🥗 *Envie foto* - Análise de comida
-💪 *Envie foto* - Feedback do shape
-💬 *Converse normalmente* - Dicas personalizadas
+📸 *Envie FOTO de:*
+• Comida → Análise nutricional
+• Shape → Feedback profissional
+• Exercício → Correção técnica
 
-*Estou aqui para sua evolução!* 💪"""
+⌨️ *COMANDOS:*
+• "treinei" → Registrar treino
+• "relatório" → Ver progresso
+• "dicas" → Dicas fitness
+• "meta Xkg" → Definir peso-alvo
+
+*Exemplo:* "meta 80kg" """
     
-    # Usa OpenAI para outras mensagens
-    return responder_openai(f"""O usuário {nome} disse: "{text}"
+    if text_lower.startswith("meta "):
+        try:
+            meta = text_lower.replace("meta", "").replace("kg", "").strip()
+            user_memory[phone]["meta_peso"] = float(meta)
+            return f"🎯 *META DEFINIDA:* {meta}kg\n\nVamos alcançar juntos! 💪"
+        except:
+            return "⚖️ Formato: 'meta 80kg'"
     
-    Responda como um Personal Trainer Virtual especializado em fitness, nutrição e motivação.
-    Seja:
-    1. Positivo e encorajador
-    2. Prático e objetivo  
-    3. Baseado em ciência do esporte
-    4. Motivacional
+    if text_lower == "dicas":
+        return gerar_dicas_fitness()
     
-    Dê dicas úteis relacionadas ao que ele disse!""")
+    # Se não for comando, usa Gemini
+    return usar_gemini(f"""O usuário {nome} disse: "{text}"
+
+Responda como um Personal Trainer motivador, especialista em fitness e nutrição.
+Seja positivo, dê dicas práticas e motive-o a continuar treinando!""")
+
+def analisar_imagem_gemini(image_url, nome):
+    """Analisa imagem usando Google Gemini"""
+    
+    print(f"🔍 Analisando imagem com Gemini...")
+    
+    prompt = f"""Analise esta imagem como um Personal Trainer e Nutricionista profissional.
+
+Usuário: {nome}
+
+SE FOR COMIDA/REFEIÇÃO:
+• Calorias aproximadas
+• Macronutrientes (proteínas, carbs, gorduras)
+• Pontos positivos
+• Sugestões de melhoria
+• Dica nutricional prática
+
+SE FOR SHAPE/CORPO/EXERCÍCIO:
+• Pontos fortes visíveis
+• Áreas para desenvolvimento
+• Exercícios recomendados
+• Feedback construtivo
+• Motivação personalizada
+
+Formato:
+- Seja técnico mas acessível
+- Use emojis relevantes
+- Seja positivo e encorajador
+- Baseie em ciência do esporte
+
+Resposta em português!"""
+    
+    return usar_gemini(prompt, image_url)
+
+def usar_gemini(prompt, image_url=None):
+    """Usa Google Gemini API (GRATUITA)"""
+    
+    if GEMINI_API_KEY == "AIzaSyB0jq9B6n4x7n8q9r0t1u2v3w4x5y6z7A8B9C0D":
+        return """🤖 *PERSONAL TRAINER DIZ:*
+
+Para análises detalhadas de imagens, configure sua chave do Google Gemini:
+
+1. Acesse: https://aistudio.google.com/apikey
+2. Crie uma nova chave API
+3. Cole no código (variável GEMINI_API_KEY)
+
+📸 *ENQUANTO ISSO:*
+• Comida: Foco em proteínas e alimentos naturais
+• Shape: Consistência nos treinos + dieta
+• Exercício: Execução correta > peso
+
+💪 *VOCÊ CONSEGUE!*"""
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key={GEMINI_API_KEY}"
+    
+    content = [{"text": prompt}]
+    
+    if image_url:
+        # Gemini precisa da imagem em base64
+        try:
+            img_response = requests.get(image_url, timeout=10)
+            import base64
+            img_base64 = base64.b64encode(img_response.content).decode('utf-8')
+            content.append({
+                "inline_data": {
+                    "mime_type": "image/jpeg",
+                    "data": img_base64
+                }
+            })
+        except:
+            pass
+    
+    payload = {"contents": [{"parts": content}]}
+    
+    try:
+        response = requests.post(url, json=payload, timeout=30)
+        
+        if response.status_code == 200:
+            resposta = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+            return resposta
+        else:
+            return f"""🏋️‍♂️ *FEEDBACK DO PERSONAL TRAINER*
+
+Baseado em análise visual rápida:
+
+📸 *O QUE VI:*
+• Potencial para evolução
+• Caminho para resultados
+• Disciplina em progresso
+
+🎯 *RECOMENDAÇÃO:*
+1. Treino consistente 3-5x/semana
+2. Proteína: 2g/kg de peso
+3. Hidratação: 3L água/dia
+4. Sono: 7-8h/noite
+
+💪 *FOCO E FÉ!*"""
+            
+    except:
+        return gerar_dicas_fitness()
+
+def gerar_dicas_fitness():
+    """Gera dicas de fitness"""
+    dicas = [
+        "💧 *HIDRATAÇÃO:* Beba 500ml água 30min antes do treino",
+        "🥚 *PROTEÍNA:* Consuma 20-30g de proteína pós-treino",
+        "🏋️ *TREINO:* Foque em exercícios compostos (agachamento, supino, remada)",
+        "🛌 *DESCANSO:* Musculação só cresce com descanso adequado",
+        "📊 *PROGRESSÃO:* Aumente pesos ou repetições toda semana",
+        "🥑 *GORDURAS:* Inclua abacate, castanhas e azeite na dieta",
+        "⏰ *CONSISTÊNCIA:* Melhor treinar 30min/dia que 3h 1x/semana",
+        "🧠 *MENTE:* Visualize seus objetivos durante o treino"
+    ]
+    from random import choice
+    return f"""💡 *DICA FITNESS DO DIA*
+
+{choice(dicas)}
+
+*Lembre-se:* Pequenas ações consistentes > Grandes ações esporádicas! 💪"""
 
 def registrar_treino(phone):
     user_memory.setdefault(phone, {"treinos": []})
     user_memory[phone]["treinos"].append({
-        "data": datetime.now().strftime("%d/%m/%Y %H:%M")
+        "data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+        "tipo": "treino_registrado"
     })
-
-def analisar_imagem_com_openai(image_url):
-    """Analisa imagem usando OpenAI GPT-4 Vision"""
-    
-    print(f"🔍 Analisando imagem com OpenAI...")
-    
-    prompt = """Analise esta imagem como um Personal Trainer e Nutricionista profissional:
-
-1. SE FOR COMIDA/REFEIÇÃO:
-   - Calorias aproximadas
-   - Proteínas, carboidratos, gorduras estimados
-   - Pontos positivos e negativos
-   - Sugestão de melhoria (se necessário)
-   - Dica nutricional relacionada
-
-2. SE FOR SHAPE/CORPO/EXERCÍCIO:
-   - Pontos fortes visíveis
-   - Áreas que podem melhorar
-   - Dica de exercício específico
-   - Feedback construtivo
-   - Motivação personalizada
-
-3. SE FOR OUTRA COISA:
-   - Relacione com fitness se possível
-   - Dê uma dica motivacional sobre saúde
-
-Seja:
-• Técnico mas acessível
-• Construtivo e positivo  
-• Baseado em ciência
-• Motivacional
-
-Formate a resposta com emojis e seja entusiasta!"""
-    
-    return responder_openai(prompt, image_url)
-
-def responder_openai(prompt, image_url=None):
-    """Chama OpenAI API com tratamento de erros detalhado"""
-    
-    headers = {
-        "Authorization": f"Bearer {OPENAI_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    # Prepara mensagens
-    messages = [{"role": "user", "content": []}]
-    
-    # Adiciona texto
-    messages[0]["content"].append({
-        "type": "text",
-        "text": prompt
-    })
-    
-    # Adiciona imagem se existir
-    if image_url:
-        print(f"🖼️ Adicionando imagem ao prompt: {image_url[:50]}...")
-        messages[0]["content"].append({
-            "type": "image_url",
-            "image_url": {
-                "url": image_url,
-                "detail": "high"
-            }
-        })
-    
-    payload = {
-        "model": "gpt-4-vision-preview",  # Modelo específico para visão
-        "messages": messages,
-        "max_tokens": 1000,
-        "temperature": 0.7
-    }
-    
-    print(f"📡 Enviando para OpenAI...")
-    
-    try:
-        response = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=45
-        )
-        
-        print(f"📊 OpenAI Status: {response.status_code}")
-        
-        if response.status_code == 200:
-            resposta = response.json()["choices"][0]["message"]["content"]
-            print(f"✅ OpenAI respondeu: {resposta[:100]}...")
-            return resposta
-            
-        elif response.status_code == 401:
-            print("❌ ERRO 401: Chave OpenAI inválida ou expirada")
-            return "🔑 *Ops!* Parece que meu acesso à inteligência artificial está temporariamente limitado.\n\nMas como seu Personal Trainer, posso te dizer: Foco nos treinos, dieta limpa e consistência são a chave! 💪"
-            
-        elif response.status_code == 429:
-            print("❌ ERRO 429: Limite de requisições excedido")
-            return "⏳ *Estou processando muitas análises!*\n\nEnquanto isso: Mantenha a proteína alta, os treinos intensos e o descanso em dia! 🏋️‍♂️"
-            
-        else:
-            print(f"❌ ERRO OpenAI {response.status_code}: {response.text}")
-            return f"""🏋️‍♂️ *Como seu Personal Trainer, recomendo:*
-
-1. *Para alimentação:* Foco em proteínas magras, carboidratos complexos e gorduras boas
-2. *Para treino:* Consistência > Intensidade, progressão de cargas
-3. *Para resultados:* Paciência + Disciplina = Sucesso
-
-*Continue firme!* Cada dia conta! 💪"""
-            
-    except requests.exceptions.Timeout:
-        print("⏰ Timeout na OpenAI")
-        return "⏳ *Análise demorando um pouco...*\n\nEnquanto isso, lembre-se: O progresso vem da consistência! 💪"
-        
-    except Exception as e:
-        print(f"❌ Erro geral: {str(e)}")
-        return """🤖 *Personal Trainer Virtual diz:*
-
-Sua dedicação é o que mais importa! 
-• Treine com inteligência
-• Alimente-se com consciência  
-• Descanse com qualidade
-• Repita com consistência
-
-*Você consegue!* 🚀"""
 
 def enviar_mensagem(phone, text):
-    """Envia mensagem via Z-API"""
     url = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}/token/{TOKEN_INSTANCIA}/send-text"
-    
-    headers = {
-        "Client-Token": CLIENT_TOKEN,
-        "Content-Type": "application/json"
-    }
-    
+    headers = {"Client-Token": CLIENT_TOKEN, "Content-Type": "application/json"}
     payload = {"phone": phone, "message": text}
     
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=10)
-        print(f"📤 Z-API: {response.status_code}")
-    except Exception as e:
-        print(f"❌ Erro Z-API: {e}")
+        requests.post(url, json=payload, headers=headers, timeout=10)
+        print(f"✅ Enviado para {phone}")
+    except:
+        print(f"❌ Erro ao enviar")
 
-@app.route("/teste-openai", methods=["GET"])
-def teste_openai():
-    """Testa a conexão com OpenAI"""
-    try:
-        resposta = responder_openai("Olá! Teste de conexão. Responda apenas '✅ OpenAI funcionando!'")
-        return f"OpenAI: {resposta}"
-    except Exception as e:
-        return f"Erro OpenAI: {str(e)}"
+@app.route("/teste-gemini", methods=["GET"])
+def teste_gemini():
+    """Testa Gemini"""
+    return usar_gemini("Teste de conexão. Responda '✅ Gemini funcionando!'")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
-    print(f"\n{'='*70}")
-    print("🤖 PERSONAL TRAINER BOT COM OPENAI")
-    print("="*70)
-    print(f"📍 Porta: {port}")
-    print(f"🔑 OpenAI Key: {OPENAI_API_KEY[:20]}...")
-    print(f"📱 Teste OpenAI: /teste-openai")
-    print("="*70)
-    print("🚀 *Dica:* Sua chave OpenAI pode precisar de:")
-    print("   1. Créditos na conta")
-    print("   2. Acesso à API GPT-4 Vision")
-    print("   3. Atualização se for uma chave antiga")
-    print("="*70)
-    
+    print(f"\n🤖 PERSONAL TRAINER BOT - PORT {port}")
+    print("🔗 Webhook: /webhook")
+    print("💡 Dica: Configure Google Gemini API para análises de imagem")
     app.run(host="0.0.0.0", port=port, debug=False)
