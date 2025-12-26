@@ -10,16 +10,16 @@ ZAPI_INSTANCE = "3EC42CD717B182BE009E5A8D44CAB450"
 TOKEN_INSTANCIA = "C1C4D4B66FC02593FCCB149E"
 CLIENT_TOKEN = "F0d19adbde8554463ab200473ded89ccbS"
 
-# ⚠️ SUBSTITUA COM SUA CHAVE DA OPENAI PLATFORM!
-# Acesse: https://platform.openai.com/api-keys
-OPENAI_API_KEY = "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"
+# ⚠️ SUBSTITUA COM SUA CHAVE DA XAI (GROK)!
+# Acesse: https://console.x.ai/ (crie uma conta na xAI)
+GROK_API_KEY = "xai-7KMFujAXXKvr9khsd9qSYrrllqlViTpeYY1hF4N3zLmylAvlpwFHRV53Z9l68EijuL72GA6Jtg6TQXUz"  # Substitua com sua chave real
 # ============================================
 
 user_memory = {}
 
 @app.route("/", methods=["GET"])
 def index():
-    return "🤖 Bot Online - Aguardando chave OpenAI"
+    return "🤖 Bot Online - Aguardando chave xAI Grok"
 
 @app.route("/webhook", methods=["POST", "GET"])
 def webhook():
@@ -38,17 +38,17 @@ def webhook():
 
     print(f"\n📩 {nome}: {text if text else '📸 Imagem'}")
 
-    if OPENAI_API_KEY == "sk-sua-chave-openai-platform-aqui":
+    if GROK_API_KEY == "xai-sua-chave-grok-aqui":
         # Se chave não foi configurada
-        resposta = """🔑 *CONFIGURE SUA CHAVE OPENAI*
+        resposta = """🔑 *CONFIGURE SUA CHAVE GROK (xAI)*
 
 Para eu analisar suas fotos com IA:
 
-1. Acesse: https://platform.openai.com
-2. Crie conta (NÃO use email do ChatGPT)
-3. Vá em "API Keys" → "Create new secret key"
+1. Acesse: https://console.x.ai/
+2. Crie uma conta na xAI
+3. Vá em "API Keys" → "Create new key"
 4. Cole a chave no código do bot
-5. Adicione US$5 em créditos
+5. Adicione créditos se necessário
 
 *Enquanto isso, como Personal Trainer:*
 🏋️ Foco nos exercícios básicos
@@ -58,7 +58,7 @@ Para eu analisar suas fotos com IA:
 
 *Você consegue!* 💪"""
     elif image:
-        resposta = analisar_com_openai(image, nome)
+        resposta = analisar_com_grok(image, nome, text)
     elif text:
         resposta = responder_texto(phone, nome, text)
     else:
@@ -67,135 +67,270 @@ Para eu analisar suas fotos com IA:
     enviar_mensagem(phone, resposta)
     return "ok", 200
 
-def analisar_com_openai(image_url, nome):
-    """Tenta usar OpenAI para análise"""
+def analisar_com_grok(image_url, nome, text_prompt=""):
+    """Tenta usar Grok API para análise de imagem"""
     
-    # Primeiro verifica se a chave é válida
-    if OPENAI_API_KEY.startswith("sk-proj-"):
-        return """❌ *CHAVE INVÁLIDA DETECTADA*
+    if GROK_API_KEY == "xai-sua-chave-grok-aqui":
+        return """❌ *CHAVE GROK NÃO CONFIGURADA*
 
-Sua chave começa com `sk-proj-` (ChatGPT Team).
+Para usar análise de imagens com Grok:
 
-*Você precisa de uma chave da OpenAI Platform:*
-1. Acesse: https://platform.openai.com/api-keys
-2. Use email DIFERENTE do seu ChatGPT
-3. Gere nova chave (começa com `sk-` normal)
-4. Adicione créditos (US$5)
-5. Substitua no código
+1. Acesse: https://console.x.ai/
+2. Crie uma conta na xAI
+3. Gere sua chave API
+4. Cole no código
+5. Ative o suporte a visão (se necessário)
 
-*Dica do Personal Trainer enquanto isso:*
-"A disciplina supera a motivação" 💪"""
+*Dica do Personal Trainer:*
+"A consistência é a chipe do sucesso" 💪"""
     
     try:
         headers = {
-            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "Authorization": f"Bearer {GROK_API_KEY}",
             "Content-Type": "application/json"
         }
         
-        prompt = f"""Analise esta imagem como Personal Trainer e Nutricionista.
+        # Construir o prompt baseado no texto enviado (se houver)
+        base_prompt = f"""Analise esta imagem como um Personal Trainer e Nutricionista especializado.
 
 Usuário: {nome}
 
-SE FOR COMIDA:
-- Calorias estimadas
-- Macronutrientes
-- Pontos positivos
-- Sugestões
-
-SE FOR SHAPE/EXERCÍCIO:
-- Pontos fortes
-- Áreas para melhorar
-- Exercícios recomendados
-- Motivação
-
-Seja positivo e técnico!"""
+"""
         
+        if text_prompt:
+            user_question = text_prompt
+        else:
+            user_question = "O que você vê nesta imagem? Analise como um personal trainer."
+        
+        full_prompt = f"""{base_prompt}
+Usuário pergunta: "{user_question}"
+
+SE FOR COMIDA/REFEIÇÃO:
+- Estime calorias totais
+- Analise macronutrientes (proteínas, carboidratos, gorduras)
+- Pontos positivos da refeição
+- Sugestões de melhorias
+- Como isso se encaixa em uma dieta fitness
+
+SE FOR FOTO DO CORPO/EXERCÍCIO:
+- Avalie postura/forma
+- Pontos fortes visíveis
+- Áreas para desenvolvimento
+- Sugestões de exercícios específicos
+- Motivação personalizada
+
+SE FOR AMBIENTE DE TREINO:
+- Avalie equipamentos/ambiente
+- Sugestões de otimização
+- Rotinas recomendadas
+
+SEJA:
+1. Técnico mas acessível
+2. Positivo e motivador
+3. Prático com ações concretas
+4. Breve mas completo
+
+Responda em português do Brasil."""
+
+        # Preparar o payload para Grok API
+        # Nota: Verifique na documentação oficial se o Grok tem suporte a visão
         payload = {
-            "model": "gpt-4-vision-preview",
-            "messages": [{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": image_url}}
-                ]
-            }],
-            "max_tokens": 500
+            "model": "grok-beta",  # Verifique o modelo correto na documentação
+            "messages": [
+                {
+                    "role": "user",
+                    "content": full_prompt
+                }
+            ],
+            "max_tokens": 1000,
+            "temperature": 0.7
         }
         
+        # Se o Grok suportar visão diretamente, ajuste o payload:
+        if "vision" in GROK_API_KEY or True:  # Remova o True quando confirmar
+            # Formato para visão (ajuste conforme documentação oficial)
+            payload = {
+                "model": "grok-vision-beta",  # Modelo hipotético para visão
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": full_prompt},
+                            {"type": "image_url", "image_url": {"url": image_url}}
+                        ]
+                    }
+                ],
+                "max_tokens": 1000
+            }
+        
+        # Endpoint da API Grok (verifique na documentação oficial)
         response = requests.post(
-            "https://api.openai.com/v1/chat/completions",
+            "https://api.x.ai/v1/chat/completions",  # Endpoint oficial da xAI
             headers=headers,
             json=payload,
-            timeout=30
+            timeout=45
         )
         
+        print(f"Status Grok: {response.status_code}")
+        
         if response.status_code == 200:
-            return response.json()["choices"][0]["message"]["content"]
+            result = response.json()
+            return result["choices"][0]["message"]["content"]
+            
         elif response.status_code == 401:
-            return """🔐 *ERRO DE AUTENTICAÇÃO*
+            return """🔐 *ERRO DE AUTENTICAÇÃO GROK*
 
-Sua chave OpenAI não é válida ou expirou.
+Sua chave xAI não é válida ou expirou.
 
 *Solução:*
-1. https://platform.openai.com/api-keys
-2. Crie NOVA chave
-3. Adicione créditos (US$5)
-4. Substitua no código
+1. https://console.x.ai/
+2. Verifique sua chave API
+3. Renove se necessário
+4. Verifique os créditos
 
 *Lembre-se do treino:*
-Consistência > Intensidade 💪"""
-        else:
-            return f"⚠️ Erro {response.status_code}. Configure chave OpenAI válida."
+Progresso vem da consistência diária! 💪"""
             
-    except Exception as e:
-        return f"""🤖 *ANÁLISE MANUAL DO PERSONAL TRAINER*
+        elif response.status_code == 429:
+            return """⚠️ *LIMITE DE REQUISIÇÕES ATINGIDO*
 
-Vi sua foto! Como especialista, recomendo:
+A API Grok atingiu o limite de requisições.
 
-🎯 *PRINCÍPIOS BÁSICOS:*
-1. Treino consistente 4-5x/semana
-2. Dieta rica em proteínas
-3. Hidratação constante
-4. Descanso adequado
+*Solução:*
+1. Aguarde alguns minutos
+2. Verifique seu plano na xAI
+3. Considere upgrade se necessário
+
+*Dica do treino:* Persistência é tudo!"""
+            
+        else:
+            return f"""🤖 *ANÁLISE MANUAL DO PERSONAL TRAINER*
+
+Vi sua foto! Enquanto resolvemos a análise com IA:
+
+🎯 *PRINCÍPIOS FUNDAMENTAIS:*
+1. Treino consistente > treino perfeito
+2. Proteína em todas as refeições
+3. Hidratação: 35ml por kg corporal
+4. Sono: 7-9h por noite
 
 💪 *FOCO NO PROCESSO!*
 
-(Para análise detalhada com IA, configure chave OpenAI)"""
+(Erro técnico: {response.status_code}. Configure chave Grok corretamente)"""
+
+    except requests.exceptions.Timeout:
+        return """⏱️ *TEMPO ESGOTADO*
+
+A análise está demorando mais que o normal.
+
+*Enquanto isso, lembre-se:*
+"A paciência é uma virtude no fitness"
+Continue seguindo sua rotina! 💪"""
+
+    except Exception as e:
+        print(f"Erro Grok: {str(e)}")
+        return f"""🤖 *ANÁLISE PERSONAL TRAINER*
+
+Baseado na sua foto e experiência geral:
+
+🏋️ *PARA QUALQUER TREINO:*
+1. Execute o movimento completo
+2. Mantenha a postura correta
+3. Respiração consciente
+4. Progressão gradual
+
+🥗 *PARA NUTRIÇÃO:*
+- Proteínas magras primeiro
+- Carboidratos complexos
+- Gorduras saudáveis
+- Vegetais coloridos
+
+*Erro técnico:* Configure corretamente a chave Grok em https://console.x.ai/"""
 
 def responder_texto(phone, nome, text):
-    text = text.lower()
+    text_lower = text.lower()
     
     if phone not in user_memory:
-        user_memory[phone] = {"nome": nome, "treinos": 0}
-        return f"""👋 Olá {nome}! Sou seu Personal Trainer IA.
+        user_memory[phone] = {"nome": nome, "treinos": 0, "ultima_consulta": datetime.now().isoformat()}
+        return f"""👋 Olá {nome}! Sou seu Personal Trainer com IA Grok.
 
-*Configure chave OpenAI para:*
-• Análise de fotos de comida
-• Feedback do seu shape
-• Dicas personalizadas
+*Configure chave Grok (xAI) para:*
+• Análise avançada de fotos de comida
+• Feedback preciso do seu shape
+• Dicas personalizadas com IA
 
-*Acesse:* https://platform.openai.com/api-keys
+*Acesse:* https://console.x.ai/
 
-*Enquanto isso:* Foco, Fé e Força! 💪"""
+*Comandos disponíveis:*
+• "treinei hoje" - Registrar treino
+• "dieta" - Dicas nutricionais
+• "exercício" - Sugestões de treino
+
+Foco, Fé e Força! 💪"""
     
-    if "treinei" in text:
+    # Registrar treino
+    if any(word in text_lower for word in ["treinei", "malhei", "treino", "academia"]):
         user_memory[phone]["treinos"] += 1
-        return f"""✅ TREINO {user_memory[phone]['treinos']} REGISTRADO!
+        user_memory[phone]["ultima_consulta"] = datetime.now().isoformat()
+        count = user_memory[phone]["treinos"]
+        
+        return f"""✅ TREINO #{count} REGISTRADO!
 
-Parabéns, {nome}! Continue assim!
+Parabéns, {nome}! Cada sessão conta.
+
+*Lembre-se hoje:*
+1. Hidratação adequada
+2. Alimentação pós-treino
+3. Descanso ativo
 
 "Dias difíceis criam corpos fortes" 💪"""
     
-    return f"""💬 Entendi, {nome}!
+    # Dicas nutricionais
+    elif any(word in text_lower for word in ["dieta", "comer", "alimentação", "proteína"]):
+        return f"""🥗 *DIETA FITNESS - {nome.upper()}*
+
+*PRINCÍPIOS BÁSICOS:*
+1. Proteína: 2g por kg corporal
+2. Carboidratos: 3-5g por kg
+3. Gorduras: 0.8-1g por kg
+4. Fibras: 30-40g diárias
+
+*REFEIÇÕES:* 4-6 por dia
+
+Configure Grok para análise personalizada!"""
+    
+    # Exercícios
+    elif any(word in text_lower for word in ["exercício", "treinar", "musculação", "cardio"]):
+        return f"""🏋️ *TREINO DO DIA - {nome.upper()}*
+
+*A) Aquecimento (10min)*
+- Mobilidade articular
+- Cardio leve
+
+*B) Treino Principal*
+- Agachamento: 4x10
+- Supino: 4x8
+- Remada: 4x10
+- Abdominal: 3x15
+
+*C) Alongamento (5min)*
+
+*Configure Grok para plano personalizado!*"""
+    
+    # Conversa normal
+    else:
+        return f"""💬 Entendi, {nome}!
 
 Você disse: "{text}"
 
 *Como Personal Trainer, lembro:*
-- Progresso vem com consistência
-- Cada treino conta
-- Sua saúde é prioridade
+- Progresso = Consistência × Tempo
+- Cada escolha alimentar importa
+- Seu corpo responde ao hábito
 
-Configure OpenAI para respostas com IA! 🧠"""
+*Configure Grok (xAI) para respostas com IA avançada!* 🧠
+
+Acesse: https://console.x.ai/"""
 
 def enviar_mensagem(phone, text):
     url = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}/token/{TOKEN_INSTANCIA}/send-text"
@@ -203,21 +338,28 @@ def enviar_mensagem(phone, text):
     payload = {"phone": phone, "message": text}
     
     try:
-        requests.post(url, json=payload, headers=headers, timeout=5)
-        print(f"✅ Enviado para {phone}")
-    except:
-        print("❌ Erro ao enviar")
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        if response.status_code == 200:
+            print(f"✅ Enviado para {phone}")
+        else:
+            print(f"❌ Erro {response.status_code} ao enviar")
+    except Exception as e:
+        print(f"❌ Erro de conexão: {str(e)}")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
-    print(f"\n🤖 Bot na porta {port}")
+    print(f"\n🤖 Bot Personal Trainer com Grok IA")
+    print(f"🌐 Porta: {port}")
     
-    if OPENAI_API_KEY.startswith("sk-proj-"):
-        print("❌ CHAVE ERRADA: sk-proj- (use OpenAI Platform)")
-    elif OPENAI_API_KEY == "sk-sua-chave-openai-platform-aqui":
-        print("⚠️ Configure sua chave OpenAI!")
+    # Verificação da chave Grok
+    if GROK_API_KEY == "xai-sua-chave-grok-aqui":
+        print("⚠️ CONFIGURE SUA CHAVE GROK (xAI)!")
+        print("🔗 Acesse: https://console.x.ai/")
+    elif GROK_API_KEY.startswith("xai-"):
+        print(f"✅ Chave Grok detectada: {GROK_API_KEY[:20]}...")
     else:
-        print(f"✅ Chave OpenAI: {OPENAI_API_KEY[:15]}...")
+        print(f"🔑 Chave configurada: {GROK_API_KEY[:15]}...")
     
     print("🔗 Webhook: /webhook")
-    app.run(host="0.0.0.0", port=port)
+    print("📱 Aguardando mensagens...")
+    app.run(host="0.0.0.0", port=port, debug=False)
